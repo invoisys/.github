@@ -1,0 +1,121 @@
+name: Pull Request Validation
+
+on:
+  workflow_call:
+
+jobs:
+  pr-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pull Request Validation Template
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || "";
+            const errors = [];
+
+            function escapeRegex(text) {
+              return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            }
+
+            function getSectionContent(title) {
+              const regex = new RegExp(
+                `##\\s+${escapeRegex(title)}\\s*([\\s\\S]*?)(?=\\n##\\s|$)`,
+                "i"
+              );
+
+              const match = body.match(regex);
+
+              if (!match) {
+                return "";
+              }
+
+              return match[1]
+                .replace(/<!--[\s\S]*?-->/g, "")
+                .split("\n")
+                .map(line => line.trim())
+                .filter(Boolean)
+                .join("\n");
+            }
+
+            function validateMinLength(name, value, minLength) {
+              const normalized = value
+                .split("\n")
+                .map(line => line.trim())
+                .filter(Boolean)
+                .join("")
+                .replace(/\s/g, "");
+
+              if (normalized.length < minLength) {
+                errors.push(
+                  `Preencha a seção '${name}' na descrição do Pull Request.`
+                );
+              }
+            }
+
+            const SECTION = {
+              WHAT: "O que foi feito?",
+              VALIDATE: "Como validar?",
+              EVIDENCES: "Evidências",
+              CHECKLIST: "Checklist",
+            };
+
+            const sections = {
+              [SECTION.WHAT]: getSectionContent(SECTION.WHAT),
+              [SECTION.VALIDATE]: getSectionContent(SECTION.VALIDATE),
+              [SECTION.EVIDENCES]: getSectionContent(SECTION.EVIDENCES),
+              [SECTION.CHECKLIST]: getSectionContent(SECTION.CHECKLIST),
+            };
+
+            validateMinLength(
+              SECTION.WHAT,
+              sections[SECTION.WHAT],
+              10
+            );
+
+            validateMinLength(
+              SECTION.VALIDATE,
+              sections[SECTION.VALIDATE],
+              10
+            );
+
+            validateMinLength(
+              SECTION.EVIDENCES,
+              sections[SECTION.EVIDENCES],
+              5
+            );
+
+            const requiredChecklistItems = [
+              "Código compilando sem erros",
+              "Testado localmente",
+              "Sem impacto conhecido ou impacto descrito abaixo",
+            ];
+
+            const checklistContent = sections[SECTION.CHECKLIST];
+
+            for (const item of requiredChecklistItems) {
+              const regex = new RegExp(
+                `[-*]\\s*\\[(x|X)\\]\\s*${escapeRegex(item)}`,
+                "i"
+              );
+
+              if (!regex.test(checklistContent)) {
+                errors.push(
+                  `Marque o item obrigatório "${item}" do checklist.`
+                );
+              }
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(
+                [
+                  "PR inválido. Corrija os itens abaixo:",
+                  "",
+                  ...errors.map(error => `- ${error}`)
+                ].join("\n")
+              );
+              return;			  
+            }
+
+            console.log("PR validado com sucesso.");
