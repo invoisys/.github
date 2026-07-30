@@ -94,6 +94,8 @@ jobs:
 
             const checklistContent = sections[SECTION.CHECKLIST];
 
+            console.log(JSON.stringify(checklistContent));
+
             for (const item of requiredChecklistItems) {
               const regex = new RegExp(
                 `[-*]\\s*\\[(x|X)\\]\\s*${escapeRegex(item)}`,
