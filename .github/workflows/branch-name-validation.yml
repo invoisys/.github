@@ -1,0 +1,50 @@
+name: Branch Name Validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-name:
+    name: Branch Name Validation Template
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check source branch
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          branch="${BRANCH#refs/heads/}"
+
+          if [[ -z "$branch" ]]; then
+            echo "::error::Could not read the PR source branch (github.head_ref is empty)."
+            exit 1
+          fi
+
+          is_valid=0
+          if [[ "$branch" =~ ^release/[0-9]+(\.[0-9]+){2,}$ ]]; then
+            is_valid=1
+          elif [[ "$branch" =~ ^(feature|fix|hotfix)/[A-Za-z][A-Za-z0-9]+-[0-9]+(-[A-Za-z0-9]+)*$ ]]; then
+            is_valid=1
+          fi
+
+          if [[ "$is_valid" -eq 1 ]]; then
+            echo "Branch name is valid: ${branch}"
+            exit 0
+          fi
+
+          echo "::error::Branch de origem '${branch}' não segue o padrão de nomeclatura da organização."
+          cat <<'EOF'
+
+          Padrões válidos de nomeclatura de branch:
+
+            release/<version>                release/2.0.60  or  release/2.0.60.1
+            feature/<JIRA>-<n>[-<sufixo>]    feature/DEP-123  or  feature/DEP-123-sbx
+            fix/<JIRA>-<n>[-<sufixo>]        fix/DEP-123  or  fix/DEP-123-sbx
+            hotfix/<JIRA>-<n>[-<sufixo>]     hotfix/DEP-123  or  hotfix/DEP-123-sbx
+         
+          EOF
+          exit 1
