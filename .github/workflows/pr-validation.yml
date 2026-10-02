@@ -20,9 +20,12 @@ jobs:
             }
 
             function getSectionContent(title) {
+              // O título casa só até o fim da própria linha e a seção termina no
+              // próximo "## " em início de linha (ou no fim do texto). Assim uma
+              // seção vazia não captura o título da seção seguinte como conteúdo.
               const regex = new RegExp(
-                `##\\s+${escapeRegex(title)}\\s*([\\s\\S]*?)(?=\\n##\\s|$)`,
-                "i"
+                `^##[ \\t]+${escapeRegex(title)}[ \\t]*$([\\s\\S]*?)(?=^##[ \\t]|(?![\\s\\S]))`,
+                "im"
               );
 
               const match = body.match(regex);
@@ -33,7 +36,7 @@ jobs:
 
               return match[1]
                 .replace(/<!--[\s\S]*?-->/g, "")
-                .split("\n")
+                .split(/\r?\n/)
                 .map(line => line.trim())
                 .filter(Boolean)
                 .join("\n");
@@ -59,6 +62,7 @@ jobs:
               VALIDATE: "Como validar?",
               EVIDENCES: "Evidências",
               CHECKLIST: "Checklist",
+              IMPACTS: "Impactos / Observações",
             };
 
             const sections = {
@@ -66,6 +70,7 @@ jobs:
               [SECTION.VALIDATE]: getSectionContent(SECTION.VALIDATE),
               [SECTION.EVIDENCES]: getSectionContent(SECTION.EVIDENCES),
               [SECTION.CHECKLIST]: getSectionContent(SECTION.CHECKLIST),
+              [SECTION.IMPACTS]: getSectionContent(SECTION.IMPACTS),
             };
 
             validateMinLength(
@@ -84,6 +89,12 @@ jobs:
               SECTION.EVIDENCES,
               sections[SECTION.EVIDENCES],
               5
+            );
+
+            validateMinLength(
+              SECTION.IMPACTS,
+              sections[SECTION.IMPACTS],
+              3
             );
 
             const requiredChecklistItems = [
@@ -117,7 +128,7 @@ jobs:
                   ...errors.map(error => `- ${error}`)
                 ].join("\n")
               );
-              return;			  
+              return;
             }
 
             console.log("PR validado com sucesso.");
